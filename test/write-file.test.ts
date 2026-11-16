@@ -61,16 +61,26 @@ it('does not fall back on unrelated disk errors', async () => {
   expect(await readdir(root)).toEqual([]);
 });
 
-it('preserves another process replacement if a fallback write fails', async () => {
+it('preserves replacement data if a fallback write fails', async () => {
   vi.mocked(link).mockRejectedValue(Object.assign(new Error('No hard links'), { code: 'ENOTSUP' }));
+  const replacement = path.join(root, 'replacement.md');
   vi.mocked(writeFileCallback).mockImplementationOnce((_file, _data, callback) => {
-    const replacement = path.join(root, 'replacement.md');
     fsSync.writeFileSync(replacement, 'Other process');
     fsSync.renameSync(replacement, target);
     callback(new Error('Disk write failed'));
   });
-  await expect(writeAtomic(target, content, false)).rejects.toThrow('Disk write failed');
-  expect(await readFile(target, 'utf8')).toBe('Other process');
+  const error: unknown = await writeAtomic(target, content, false).catch((caught: unknown) => caught);
+  expect(error).toBeInstanceOf(Error);
+  const code = (error as NodeJS.ErrnoException).code;
+  if (process.platform === 'win32' && (code === 'EPERM' || code === 'EACCES')) {
+    // The exclusive open can prevent replacement. Cleanup removes only the
+    // failed writer's files and leaves the other program's data in its temp.
+    expect(await readFile(replacement, 'utf8')).toBe('Other process');
+    expect(await readdir(root)).toEqual(['replacement.md']);
+  } else {
+    expect((error as Error).message).toContain('Disk write failed');
+    expect(await readFile(target, 'utf8')).toBe('Other process');
+  }
 });
 
 // Windows chmod cannot represent POSIX group permission bits.

@@ -9,7 +9,7 @@ import { fixtureManifest } from './fixtures/manifest.js';
 
 const exec = promisify(execFile);
 const repo = fileURLToPath(new URL('..', import.meta.url));
-const mock = fileURLToPath(new URL('fixtures/mock-fetch.mjs', import.meta.url));
+const mock = new URL('fixtures/mock-fetch.mjs', import.meta.url).href;
 let root: string;
 let config: string;
 let fixture: { ref: string; manifestPath: string; manifest: ReturnType<typeof fixtureManifest>; fail?: string };

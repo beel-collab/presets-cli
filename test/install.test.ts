@@ -420,13 +420,26 @@ describe('installer', () => {
     expect(await readFile(path.join(root, 'AGENTS.md'), 'utf8')).toBe('Personal\n');
   });
 
-  it.each(['in-place', 'atomic'].flatMap((style) => ['edit-on-append-open', 'edit-on-append-write'].map((kind) => ({ style, kind }))))('preserves an editor save with $style during $kind', async ({ style, kind }) => {
+  it.each(['in-place', 'atomic'].flatMap((style) => ['edit-on-append-open', 'edit-on-append-write'].map((kind) => ({ style, kind }))))('preserves editor data with $style during $kind', async ({ style, kind }) => {
     const file = path.join(root, 'AGENTS.md');
     const edited = 'Personal instructions\r\nNew editor line\r\n';
     await writeFile(file, 'Personal instructions\r\n');
     const identity = await stat(file);
     hookWriter({ kind, style, content: edited });
-    const result = await install(createPlan([fixtureStack()], ['codex'], { only: 'standards' }), root, async () => Buffer.from('New rules'));
+    let result;
+    try {
+      result = await install(createPlan([fixtureStack()], ['codex'], { only: 'standards' }), root, async () => Buffer.from('New rules'));
+    } catch (error) {
+      // Windows can deny the editor's rename while the append handle is open.
+      if (process.platform !== 'win32' || style !== 'atomic' || kind !== 'edit-on-append-write') throw error;
+      expect(error).toBeInstanceOf(PartialInstallError);
+      expect((error as Error).message).toMatch(/EPERM|EACCES/);
+      expect((error as PartialInstallError).results).toEqual([]);
+      expect(await readFile(file, 'utf8')).toBe('Personal instructions\r\n');
+      expect(await readFile(path.join(root, 'editor-save.tmp'), 'utf8')).toBe(edited);
+      expect((await readdir(root)).some((name) => name.startsWith('.presets-'))).toBe(false);
+      return;
+    }
     const actual = await readFile(file, 'utf8');
     expect(result[0].action).toBe('appended');
     expect(actual.startsWith(edited)).toBe(true);
