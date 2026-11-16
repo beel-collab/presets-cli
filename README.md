@@ -8,7 +8,22 @@ npx presets-dev add nextjs --tool claude
 npx presets-dev list
 ```
 
-> **Status:** spec only. This README is the build brief. Build exactly what's here, keep v1 small, and ship it.
+> **Status:** v1 implemented. This README remains the build brief and behavior reference. The owner merges and publishes.
+
+To work on the CLI locally:
+
+```bash
+npm ci
+npm run build
+node dist/cli.js list
+node dist/cli.js add nextjs --tool cursor --dry-run
+npm run lint
+npm run typecheck
+npm test
+npm pack --dry-run
+```
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for test coverage and dependency constraints.
 
 ---
 
@@ -59,6 +74,7 @@ Content lives in the public repo **`beel-collab/presets.dev`**. The CLI reads it
 ```
 
 - `role` is `standards` (the rules/instructions file) or `skill`.
+- Entries for tools unsupported by the installed CLI are ignored, so adding a tool to the live manifest does not break existing installations.
 - **Install the `exports` file, never the `catalog` file.** Catalog files carry presets.dev metadata frontmatter; export files are the clean native versions.
 - The project-relative destination is the export path with the `release/<stack>/native/<bucket>/` prefix stripped. For example, `release/nextjs/native/claude/.claude/rules/nextjs-rules.md` installs to `.claude/rules/nextjs-rules.md`.
 - Only stacks with `status: "complete"` can be installed.
@@ -84,8 +100,10 @@ Hard rules:
 1. **Windsurf installs only under `.devin/`.** Never also write to `.windsurf/`.
 2. **Never replace `AGENTS.md`, `GEMINI.md` or `CLAUDE.md`.** Append a marked section (see §6). Create the file if it's missing.
 3. **Antigravity:** append to `GEMINI.md` *or* `AGENTS.md`, never both.
-4. **Shared skill path:** Codex and Antigravity share `.agents/skills/<skill>/SKILL.md`; write it once even if both tools are selected. Cursor, Copilot and Devin also read `.agents/skills`, so if `.agents/skills/<skill>/` already exists when installing for those tools, skip their own copy and print a note (avoids duplicate skills with the same name).
+4. **Shared skill path:** Codex and Antigravity share `.agents/skills/<skill>/SKILL.md`; write it once even if both tools are selected. Cursor, Copilot and Devin also read `.agents/skills`, so if `.agents/skills/<skill>/SKILL.md` already exists, or this run writes it, skip their own copy and print a note (avoids duplicate skills with the same name). An empty or unsearchable skill folder doesn't count, so their own copy still installs.
 5. **Never overwrite an existing file** unless `--force` is given. Report it as `skipped (exists)`.
+6. **Legacy Cline files:** if `.clinerules` is a file, preserve it and skip Cline standards with a note. Continue installing skills and presets for other selected tools, including with `--force`.
+7. **Shared AGENTS sections:** when Codex and Antigravity are both selected with `--agents-md`, use the Codex standards export regardless of manifest order. Antigravity alone uses its own export.
 
 ## 5. Commands
 
@@ -122,7 +140,13 @@ Wrap every appended section in markers so re-runs are safe:
 ```
 
 - If the marker for that stack already exists, skip it (`skipped (exists)`); with `--force`, replace only the content between the markers.
-- Separate from existing content with one blank line. Preserve the file's existing line endings (detect CRLF vs LF and match it) and keep a trailing newline.
+- If the file's markers for that stack are malformed (a lone, repeated or out-of-order marker), leave the file untouched and report `skipped (malformed presets.dev markers)`; the other files still install.
+- If the file is not UTF-8 text (a UTF-16 or UTF-32 byte-order mark, or NUL bytes, as Windows PowerShell 5.1's `>` produces), leave it untouched and report `skipped (unsupported text encoding)`. A UTF-8 byte-order mark is fine.
+- If appending fails partway (for example, the disk is full), preserve the file and report the write error with instructions to inspect and remove any unfinished presets.dev section by hand before retrying. This preserves edits made by other programs during error recovery.
+- If a downloaded section export itself contains `presets.dev` markers, don't write it (`skipped (export contains presets.dev markers)`), so a content mistake can't leave a file later runs refuse. Dry runs don't download, so only a real run reports this.
+- Separate from existing content with one blank line, preserving any existing trailing blank lines. Preserve the file's existing line endings (detect CRLF vs LF and match it) and keep a trailing newline.
+- Section updates use a temporary per-file lock, so overlapping CLI installs re-read and merge the latest contents. Locks are removed on completion; a stale lock after a terminated process produces a retry message instead of being removed automatically.
+- New sections append through an open file handle without rewriting existing text. If an editor replaces the file, the worker re-reads and retries. Forced replacements check the original identity and contents after preparing the new file, and abort on detected edits; this check is not an atomic compare-and-swap against editors, so avoid simultaneous editor saves during `--force`.
 
 ## 7. Tool auto-detection
 
@@ -139,7 +163,7 @@ Look in `--cwd` for these signals:
 | antigravity | `GEMINI.md` or `.gemini/` |
 
 - One detected: use it.
-- Several detected: interactive multi-select (all preselected); with `--yes`, use all of them.
+- Several detected: interactive multi-select of all 7 tools, with detected tools preselected; with `--yes`, use all detected tools.
 - None: interactive single/multi-select of all 7; with `--yes` or a non-TTY, exit 1 with "No AI tool detected. Pass --tool <cursor|copilot|claude|windsurf|cline|codex|antigravity>."
 
 ## 8. Errors and exit codes
@@ -147,12 +171,22 @@ Look in `--cwd` for these signals:
 - Unknown stack: exit 1, and suggest the closest ids (simple edit distance) plus `presets-dev list`.
 - Unknown tool: exit 1, and list valid ids.
 - Network/HTTP failure: exit 2 with the URL that failed; no partial writes for that file. Write files only after their content is fully downloaded; download everything first, then write.
+- Downloads are deduplicated and run up to six at a time. A failed download stops new requests; in-flight requests finish before the command exits without writing.
+- A `--cwd` that doesn't exist, isn't a folder, or can't be searched: exit 1 before detection or any download.
 - Exit 0 on success, including when everything was skipped.
 - `--dry-run` never touches disk.
 
 ## 9. Safety
 
 - Only write inside `--cwd`. Reject any computed path that escapes it (after normalising) or is absolute.
+- Read-only checks for existing files and shared skills may follow symlinks. Paths that will be written must not contain symlinks.
+- A problem with one target is reported for that file and the other files still install:
+  - a parent folder that is a regular file (for example a `.github` file): `skipped (parent folder is a file)`;
+  - a folder or other non-file where a file should be: `skipped (not a regular file)`;
+  - a read-only or unreadable file, or a folder that can't be written or searched: `skipped (permission denied)`. A file that already has what would be installed still reports `skipped (exists)`. Windows reports every folder as writable, so a folder denied by its access list is only caught if the write fails with `EACCES`;
+  - a hard-linked file: `skipped (file is hard-linked)`. Appending would change another filename outside the project, and replacing (`--force`) would silently split the names apart, so both are refused. Make an independent project copy before retrying. A `.presets-<uuid>.tmp` link left by an interrupted earlier run is the installer's own and doesn't count; it is removed before writing.
+- Safety failures (a symlink or swapped folder found while writing, a project directory that changed) still stop the install and list the files already written.
+- Writes run in an isolated Node worker with its working directory pinned to each validated destination parent. Directory swaps cannot redirect writes through a replacement symlink. Replacement preserves the existing file's permission bits.
 - Fetch only from the configured raw GitHub base URL over HTTPS. No `eval`, no executing downloaded content, and no postinstall scripts in the package.
 - No telemetry in v1.
 
@@ -168,6 +202,9 @@ presets-cli/
     detect.ts       # tool auto-detection
     markers.ts      # append/replace marked sections, EOL handling
     fetch.ts        # raw fetch with base URL + ref
+    writer-client.ts # sends downloaded bytes to the isolated writer
+    writer.ts       # pinned directories and shared-file locks
+    write-file.ts   # file-handle reads and atomic publication
   test/
     fixtures/       # tiny fake manifest + files
     *.test.ts
@@ -183,20 +220,22 @@ Keep `plan.ts` pure (no I/O) so the install rules in §4 are fully covered by un
 
 The build is done when all of these pass:
 
-- [ ] `npx presets-dev list` shows 30 stacks from the live manifest.
-- [ ] `add nextjs --tool cursor` in an empty dir creates `.cursor/rules/nextjs-rules.mdc` and `.cursor/skills/nextjs-code-review/SKILL.md`, byte-identical to the export files.
-- [ ] Same check passes for copilot, claude, windsurf (`.devin/` only; nothing under `.windsurf/`) and cline.
-- [ ] `add nextjs --tool codex` with an existing `AGENTS.md` keeps its original content and appends one marked section; re-running changes nothing.
-- [ ] `add nextjs --tool codex,antigravity` writes `.agents/skills/nextjs-code-review/SKILL.md` once and appends to `AGENTS.md` and `GEMINI.md` respectively.
-- [ ] `--agents-md` sends antigravity's section to `AGENTS.md`, not `GEMINI.md`, and doesn't duplicate if codex's section is already there for that stack.
-- [ ] A CRLF `AGENTS.md` stays CRLF after appending.
-- [ ] Existing files are skipped without `--force` and replaced with it.
-- [ ] `--dry-run` prints the full plan and writes nothing.
-- [ ] Auto-detect works for each signal in §7; no-tool + `--yes` exits 1 with the message.
-- [ ] Unknown stack suggests close matches; network failure exits 2 and leaves no partial files.
-- [ ] Path-escape attempts in a malicious fixture manifest are rejected.
-- [ ] Unit tests cover every row of §4; CI (GitHub Actions, Node 18/20/22) runs lint, typecheck and tests.
-- [ ] `npm pack` contains only `dist/`, `README.md`, `LICENSE` and `package.json`.
+Verified locally against the live content and the packed npm tarball. Registry publication is owner-run. The Node 18/20/22 checks pass locally; the GitHub Actions workflow is configured and awaits the branch push.
+
+- [x] `npx presets-dev list` shows 30 stacks from the live manifest (tested using the local tarball).
+- [x] `add nextjs --tool cursor` in an empty dir creates `.cursor/rules/nextjs-rules.mdc` and `.cursor/skills/nextjs-code-review/SKILL.md`, byte-identical to the export files.
+- [x] Same check passes for copilot, claude, windsurf (`.devin/` only; nothing under `.windsurf/`) and cline.
+- [x] `add nextjs --tool codex` with an existing `AGENTS.md` keeps its original content and appends one marked section; re-running changes nothing.
+- [x] `add nextjs --tool codex,antigravity` writes `.agents/skills/nextjs-code-review/SKILL.md` once and appends to `AGENTS.md` and `GEMINI.md` respectively.
+- [x] `--agents-md` sends antigravity's section to `AGENTS.md`, not `GEMINI.md`, and doesn't duplicate if codex's section is already there for that stack.
+- [x] A CRLF `AGENTS.md` stays CRLF after appending.
+- [x] Existing files are skipped without `--force` and replaced with it.
+- [x] `--dry-run` prints the full plan and writes nothing.
+- [x] Auto-detect works for each signal in §7; no-tool + `--yes` exits 1 with the message.
+- [x] Unknown stack suggests close matches; network failure exits 2 and leaves no partial files.
+- [x] Path-escape attempts in a malicious fixture manifest are rejected.
+- [x] Unit tests cover every row of §4; CI (GitHub Actions, Node 18/20/22) is configured to run lint, typecheck and tests.
+- [x] `npm pack` contains only `dist/`, `README.md`, `LICENSE` and `package.json`.
 
 ## 12. Working rules for this repo
 
