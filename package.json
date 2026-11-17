@@ -1,0 +1,42 @@
+{
+  "name": "presets-dev",
+  "version": "0.1.0",
+  "description": "Install presets.dev coding rules and skills in each tool's native paths.",
+  "keywords": ["presets", "cli", "ai", "coding-rules", "agent-skills"],
+  "type": "module",
+  "bin": { "presets-dev": "dist/cli.js", "presets": "dist/cli.js" },
+  "files": ["dist"],
+  "engines": { "node": ">=22" },
+  "license": "MIT",
+  "author": "presets.dev",
+  "repository": { "type": "git", "url": "https://github.com/beel-collab/presets-cli.git" },
+  "homepage": "https://presets.dev",
+  "bugs": { "url": "https://github.com/beel-collab/presets-cli/issues" },
+  "scripts": {
+    "build": "tsup",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "picocolors": "^1.1.1",
+    "prompts": "^2.4.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@types/node": "^18.19.0",
+    "@types/prompts": "^2.4.9",
+    "eslint": "^9.39.0",
+    "tsup": "^8.5.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.0",
+    "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "tsup": { "esbuild": "^0.28.1" },
+    "@typescript-eslint/typescript-estree": { "minimatch": "^11.0.1" },
+    "vite": "^6.4.6"
+  }
+}
