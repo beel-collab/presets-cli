@@ -43,7 +43,7 @@ See [DEVELOPMENT.md](../DEVELOPMENT.md) for test coverage and dependency constra
 |---|---|
 | npm name | `presets-dev` (also reserve `presets.dev`, and create the npm org `presetsdev` for later `@presetsdev/*`) |
 | Binaries | `presets-dev` (main) and `presets` (alias) |
-| Runtime | Node >= 18 (built-in `fetch`), ESM, TypeScript compiled to `dist/` |
+| Runtime | Node >= 22 (built-in `fetch`), ESM, TypeScript compiled to `dist/` |
 | Dependencies | Keep tiny: an arg parser (`commander` or `cac`), `picocolors`, `prompts` (only for the multi-tool prompt). No heavy frameworks. |
 | Build/test | `tsup` for building, `vitest` for tests |
 | License | MIT, © presets.dev |
@@ -220,7 +220,7 @@ Keep `plan.ts` pure (no I/O) so the install rules in §4 are fully covered by un
 
 The build is done when all of these pass:
 
-Verified locally against the live content and the packed npm tarball. Registry publication is owner-run. The Node 18/20/22 checks pass locally; the GitHub Actions workflow is configured and awaits the branch push.
+Verified locally against the live content and the packed npm tarball. Registry publication is owner-run. GitHub Actions is configured for Node 22/24/26 across Linux, macOS, and Windows.
 
 - [x] `npx presets-dev list` shows 30 stacks from the live manifest (tested using the local tarball).
 - [x] `add nextjs --tool cursor` in an empty dir creates `.cursor/rules/nextjs-rules.mdc` and `.cursor/skills/nextjs-code-review/SKILL.md`, byte-identical to the export files.
@@ -234,7 +234,7 @@ Verified locally against the live content and the packed npm tarball. Registry p
 - [x] Auto-detect works for each signal in §7; no-tool + `--yes` exits 1 with the message.
 - [x] Unknown stack suggests close matches; network failure exits 2 and leaves no partial files.
 - [x] Path-escape attempts in a malicious fixture manifest are rejected.
-- [x] Unit tests cover every row of §4; CI (GitHub Actions, Node 18/20/22) is configured to run lint, typecheck and tests.
+- [x] Unit tests cover every row of §4; CI (GitHub Actions, Node 22/24/26) is configured to run lint, typecheck and tests.
 - [x] `npm pack` contains only `dist/`, `README.md`, `LICENSE` and `package.json`.
 
 ## 12. Working rules for this repo

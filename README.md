@@ -4,7 +4,7 @@ Install coding rules and skills into your project's native AI tool folders. Brow
 
 ## Install
 
-Requires Node.js 18 or newer and an internet connection. Run from your project directory.
+Requires Node.js 22 or newer and an internet connection. Run from your project directory.
 
 ```bash
 npx presets-dev add nextjs
