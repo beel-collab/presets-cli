@@ -63,7 +63,7 @@ Existing files and installed sections are skipped by default. Instruction sectio
 
 `list` accepts `--tool <tool>`, `--json`, and `--ref <ref>`. Use `--help` for command help and `--version` for the CLI version.
 
-Developer documentation is available in the [development guide](https://github.com/beel-collab/presets-cli/blob/main/DEVELOPMENT.md) and [build specification](https://github.com/beel-collab/presets-cli/blob/main/docs/SPEC.md).
+Developer documentation is available in the [development guide](https://github.com/beel-collab/presets-cli/blob/master/DEVELOPMENT.md) and [build specification](https://github.com/beel-collab/presets-cli/blob/master/docs/SPEC.md).
 
 ## License
 

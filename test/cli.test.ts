@@ -40,7 +40,7 @@ describe('built CLI', () => {
     expect(result.code).toBe(0);
     expect(JSON.parse(result.stdout)).toHaveLength(2);
     expect((await run(['--help'])).stdout).toContain('add');
-    expect((await run(['--version'])).stdout.trim()).toBe('0.1.0');
+    expect((await run(['--version'])).stdout.trim()).toBe('0.1.1');
   });
   it('adds multiple stacks, filters roles, and respects --ref and --cwd', async () => {
     fixture.ref = 'test-tag';
