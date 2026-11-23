@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile, stat, chmod, rename, realpath, link } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile, stat, chmod, rename, realpath, link, utimes } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -418,6 +418,30 @@ describe('installer', () => {
     await expect(install(createPlan([fixtureStack()], ['codex'], { only: 'standards' }), root, async () => content)).rejects.toThrow('Installation is busy: AGENTS.md');
     expect((await stat(lock)).isDirectory()).toBe(true);
     expect(await readFile(path.join(root, 'AGENTS.md'), 'utf8')).toBe('Personal\n');
+  });
+
+  it.each([
+    { name: 'its owner process is gone', owner: '2147483646', age: 0 },
+    { name: 'it has no owner and is older than any real write', owner: undefined, age: 60 },
+  ])('breaks a stale section lock when $name', async ({ owner, age }) => {
+    await writeFile(path.join(root, 'AGENTS.md'), 'Personal\n');
+    const lock = path.join(root, '.presets-AGENTS.md.lock');
+    await mkdir(lock);
+    if (owner) await writeFile(path.join(lock, 'owner'), owner);
+    if (age) await utimes(lock, new Date(Date.now() - age * 1000), new Date(Date.now() - age * 1000));
+    const results = await install(createPlan([fixtureStack()], ['codex'], { only: 'standards' }), root, async () => content);
+    expect(results).toEqual([{ path: 'AGENTS.md', action: 'appended' }]);
+    expect((await readdir(root)).filter((name) => name.includes('.lock'))).toEqual([]);
+  });
+
+  it('waits for a section lock held by a live process', async () => {
+    await writeFile(path.join(root, 'AGENTS.md'), 'Personal\n');
+    const lock = path.join(root, '.presets-AGENTS.md.lock');
+    await mkdir(lock);
+    await writeFile(path.join(lock, 'owner'), String(process.pid));
+    hookWriter({ kind: 'fast-timeout' });
+    await expect(install(createPlan([fixtureStack()], ['codex'], { only: 'standards' }), root, async () => content)).rejects.toThrow('Installation is busy: AGENTS.md');
+    expect(await readFile(path.join(lock, 'owner'), 'utf8')).toBe(String(process.pid));
   });
 
   it.each(['in-place', 'atomic'].flatMap((style) => ['edit-on-append-open', 'edit-on-append-write'].map((kind) => ({ style, kind }))))('preserves editor data with $style during $kind', async ({ style, kind }) => {

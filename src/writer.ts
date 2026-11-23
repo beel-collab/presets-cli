@@ -1,4 +1,4 @@
-import { access, lstat, stat, mkdir, rmdir, unlink } from 'node:fs/promises';
+import { access, lstat, stat, mkdir, readFile, rename, rm, rmdir, unlink, writeFile } from 'node:fs/promises';
 import { constants, lstatSync, rmdirSync, unlinkSync, type Stats } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -62,7 +62,10 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
     }
     // Without this, Ctrl-C skips the finally that releases the lock and every
     // later install of the same file fails as busy until it is removed by hand.
-    if (heldLock) { try { rmdirSync(heldLock); } catch { /* already gone */ } }
+    if (heldLock) {
+      try { unlinkSync(path.join(heldLock, LOCK_OWNER)); } catch { /* not written yet */ }
+      try { rmdirSync(heldLock); } catch { /* already gone */ }
+    }
     // A temp file may already be linked as the target; leaving it would give
     // the target a second link that every later append refuses.
     for (const temp of liveTemps) { try { unlinkSync(temp); } catch { /* already gone */ } }
@@ -70,19 +73,57 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
   });
 }
 
+// A lock is a folder holding its owner's pid. A crash or SIGKILL skips every
+// cleanup path, so a later run breaks a lock whose owner is gone, or one older
+// than any real write (sections are written after all downloads finish).
+const LOCK_OWNER = 'owner';
+const STALE_LOCK_MS = 30_000;
+
+function ownerAlive(pid: number): boolean {
+  try { process.kill(pid, 0); return true; }
+  catch (error) { return (error as NodeJS.ErrnoException).code === 'EPERM'; }
+}
+
+// Undefined when the lock is gone or still held. Age is checked once per run,
+// so a lock held by a live installer is never broken while we wait for it.
+async function staleLock(lock: string, checkAge: boolean): Promise<Stats | undefined> {
+  const info = await lstat(lock).catch((error: unknown) => { if (isMissing(error)) return undefined; throw error; });
+  if (!info?.isDirectory()) return undefined;
+  const owner = Number.parseInt(await readFile(path.join(lock, LOCK_OWNER), 'utf8').catch(() => ''), 10);
+  if (Number.isInteger(owner) && owner > 0 && owner !== process.pid && !ownerAlive(owner)) return info;
+  return checkAge && Date.now() - info.mtimeMs > STALE_LOCK_MS ? info : undefined;
+}
+
+async function breakLock(lock: string, seen: Stats): Promise<void> {
+  // Move it aside first, so two runs breaking the same lock can't both win,
+  // and never move a lock that was replaced since it was judged stale.
+  const current = await lstat(lock).catch(() => undefined);
+  if (!current || !sameFile(current, seen)) return;
+  const aside = `${lock}.stale-${process.pid}-${Date.now()}`;
+  try { await rename(lock, aside); }
+  catch (error) { if (isMissing(error)) return; throw error; }
+  await rm(aside, { recursive: true, force: true });
+}
+
 async function lockSection(file: string): Promise<() => Promise<void>> {
   const lock = `.presets-${file}.lock`;
   const deadline = Date.now() + 5_000;
+  let checkAge = true;
   for (;;) {
     try { await mkdir(lock, { mode: 0o700 }); break; }
     catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      const stale = await staleLock(lock, checkAge);
+      checkAge = false;
+      if (stale) { await breakLock(lock, stale); continue; }
       if (Date.now() >= deadline) throw new PresetsError(`Installation is busy: ${file}. If no installer is running, remove the stale ${lock} directory and retry.`);
       await delay(25);
     }
   }
   heldLock = lock;
+  await writeFile(path.join(lock, LOCK_OWNER), String(process.pid));
   return async () => {
+    await unlink(path.join(lock, LOCK_OWNER)).catch((error: unknown) => { if (!isMissing(error)) throw error; });
     await rmdir(lock);
     heldLock = undefined;
   };
