@@ -75,14 +75,14 @@ describe('installer', () => {
     await addSkill(path.join(root, '.agents/skills/nextjs-code-review'));
     const plan = createPlan([fixtureStack()], [tool]);
     const result = await install(plan, root, async () => content, { force: true });
-    expect(result[1].action).toBe('skipped (shared skill already present)');
+    expect(result[1].action).toBe('skipped (uses shared .agents/skills/nextjs-code-review)');
     await expect(readFile(path.join(root, plan.files[1].target))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('avoids native skill duplicates when the shared skill is in the same plan', async () => {
     const plan = createPlan([fixtureStack()], ['cursor', 'copilot', 'windsurf', 'codex']);
     const result = await install(plan, root, async () => content);
-    expect(result.filter((item) => item.action === 'skipped (shared skill already present)')).toHaveLength(3);
+    expect(result.filter((item) => item.action === 'skipped (uses shared .agents/skills/nextjs-code-review)')).toHaveLength(3);
   });
 
   it('forces replacement of ordinary files without leaving temporary files', async () => {
@@ -141,7 +141,7 @@ describe('installer', () => {
       await addSkill(path.join(outside, 'skills/nextjs-code-review'));
       await symlink(outside, path.join(root, '.agents'), 'dir');
       const results = await install(createPlan([fixtureStack()], ['cursor', 'codex'], { only: 'skill' }), root, async () => content);
-      expect(results.map((result) => result.action)).toEqual(['skipped (shared skill already present)', 'skipped (exists)']);
+      expect(results.map((result) => result.action)).toEqual(['skipped (uses shared .agents/skills/nextjs-code-review)', 'skipped (exists)']);
     } finally { await rm(outside, { recursive: true, force: true }); }
   });
 
@@ -190,12 +190,12 @@ describe('installer', () => {
 
   it.each([false, true])('preserves a legacy .clinerules file and continues other installs (force=%s)', async (force) => {
     await writeFile(path.join(root, '.clinerules'), 'Personal legacy rules');
-    const plan = createPlan([fixtureStack()], ['cursor', 'cline']);
+    const plan = createPlan([fixtureStack()], ['claude', 'cline']);
     const result = await install(plan, root, async () => content, { force });
     expect(result.find((item) => item.path.startsWith('.clinerules/'))?.action).toBe('skipped (legacy .clinerules file)');
     expect(await readFile(path.join(root, '.clinerules'), 'utf8')).toBe('Personal legacy rules');
     expect(await readFile(path.join(root, '.cline/skills/nextjs-code-review/SKILL.md'))).toEqual(content);
-    expect(await readFile(path.join(root, '.cursor/rules/nextjs-rules.mdc'))).toEqual(content);
+    expect(await readFile(path.join(root, '.claude/rules/nextjs-rules.md'))).toEqual(content);
   });
 
   it('previews the legacy Cline conflict without downloading or writing', async () => {
@@ -225,7 +225,7 @@ describe('installer', () => {
       await symlink(outside, path.join(root, '.agents'), 'dir');
       await symlink(outside, path.join(root, '.claude'), 'dir');
       const result = await install(createPlan([fixtureStack()], ['cursor']), root, async () => content, { dryRun });
-      expect(result[1].action).toBe('skipped (shared skill already present)');
+      expect(result[1].action).toBe('skipped (uses shared .agents/skills/nextjs-code-review)');
       expect(await readdir(path.join(outside, 'skills/nextjs-code-review'))).toEqual(['SKILL.md']);
       if (!dryRun) expect(await readFile(path.join(root, '.cursor/rules/nextjs-rules.mdc'))).toEqual(content);
     } finally { await rm(outside, { recursive: true, force: true }); }
@@ -304,7 +304,7 @@ describe('installer', () => {
       return content;
     });
     await install(plan, root, download);
-    expect(download).toHaveBeenCalledTimes(11);
+    expect(download).toHaveBeenCalledTimes(new Set(plan.files.map((file) => file.source)).size);
     expect(peak).toBeGreaterThan(1);
     expect(peak).toBeLessThanOrEqual(6);
     expect(active).toBe(0);
@@ -687,7 +687,7 @@ describe('installer', () => {
       await addSkill(path.join(root, '.agents/skills/nextjs-code-review'));
       return content;
     }, { force });
-    expect(result[0].action).toBe('skipped (shared skill already present)');
+    expect(result[0].action).toBe('skipped (uses shared .agents/skills/nextjs-code-review)');
     await expect(readFile(path.join(root, plan.files[0].target))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
@@ -700,7 +700,7 @@ describe('installer', () => {
       await addSkill(path.join(root, '.agents/skills/nextjs-code-review'));
       return content;
     }, { force: true });
-    expect(result[0].action).toBe('skipped (shared skill already present)');
+    expect(result[0].action).toBe('skipped (uses shared .agents/skills/nextjs-code-review)');
     expect(await readFile(target, 'utf8')).toBe('Personal copy');
   });
 

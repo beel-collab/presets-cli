@@ -30,6 +30,21 @@ describe('native install plan', () => {
     expect(createPlan(stacks, ['antigravity'], { agentsMd: true }).files[0].target).toBe('AGENTS.md');
   });
 
+  it('adds one shared .agents skill when two or more selected tools read it', () => {
+    const skills = (tools: Tool[]) => createPlan([fixtureStack()], tools, { only: 'skill' }).files
+      .map(({ target, sharedSkill }) => `${target}${sharedSkill ? ' (shared)' : ''}`);
+    expect(skills(['cursor', 'copilot'])).toEqual([
+      '.cursor/skills/nextjs-code-review/SKILL.md (shared)', '.github/skills/nextjs-code-review/SKILL.md (shared)',
+      '.agents/skills/nextjs-code-review/SKILL.md',
+    ]);
+    expect(skills(['cline'])).toEqual(['.cline/skills/nextjs-code-review/SKILL.md (shared)']);
+    // Claude Code doesn't read .agents/skills, so it neither triggers nor skips the shared copy.
+    expect(skills(['cursor', 'claude'])).toEqual([
+      '.cursor/skills/nextjs-code-review/SKILL.md (shared)', '.claude/skills/nextjs-code-review/SKILL.md',
+    ]);
+    expect(createPlan([fixtureStack()], ['cursor', 'copilot'], { only: 'standards' }).files).toHaveLength(2);
+  });
+
   it('supports multiple stacks and role filtering', () => {
     for (const only of ['standards', 'skill'] as const) {
       const plan = createPlan([fixtureStack(), fixtureStack('react')], ['cursor'], { only });

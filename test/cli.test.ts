@@ -153,12 +153,25 @@ describe('built CLI', () => {
 
   it('reports a legacy Cline conflict and still installs Cline skills and other tools', async () => {
     await writeFile(path.join(root, '.clinerules'), 'Personal rules');
-    const result = await run(['add', 'nextjs', '--tool', 'cline,cursor', '--force']);
+    const result = await run(['add', 'nextjs', '--tool', 'cline,claude', '--force']);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('skipped (legacy .clinerules file) .clinerules/nextjs-rules.md');
     expect(result.stdout).toContain('3 file action(s), 1 skipped.');
     expect(await readFile(path.join(root, '.clinerules'), 'utf8')).toBe('Personal rules');
     expect(await readFile(path.join(root, '.cline/skills/nextjs-code-review/SKILL.md'), 'utf8')).toBe('Synthetic native export\n');
-    expect(await readFile(path.join(root, '.cursor/rules/nextjs-rules.mdc'), 'utf8')).toBe('Synthetic native export\n');
+    expect(await readFile(path.join(root, '.claude/rules/nextjs-rules.md'), 'utf8')).toBe('Synthetic native export\n');
+  });
+  it('writes a skill once to .agents/skills for several tools that read it', async () => {
+    const result = await run(['add', 'nextjs', '--tool', 'cursor,claude,copilot,cline', '--only', 'skill']);
+    expect(result.code).toBe(0);
+    for (const own of ['.cursor', '.github', '.cline']) {
+      expect(result.stdout).toContain(`skipped (uses shared .agents/skills/nextjs-code-review) ${own}/skills/nextjs-code-review/SKILL.md`);
+    }
+    expect(result.stdout).toContain('created .agents/skills/nextjs-code-review/SKILL.md');
+    expect(result.stdout).toContain('created .claude/skills/nextjs-code-review/SKILL.md');
+    expect((await readdir(root)).sort()).toEqual(['.agents', '.claude', 'fixture.json']);
+    // One tool alone keeps its native folder.
+    const alone = await run(['add', 'nextjs', '--tool', 'cursor', '--only', 'skill', '--cwd', path.join(root, '.claude')]);
+    expect(alone.stdout).toContain('created .cursor/skills/nextjs-code-review/SKILL.md');
   });
 });

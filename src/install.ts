@@ -3,7 +3,7 @@ import { constants } from 'node:fs';
 import path from 'node:path';
 import { blockerOnPath, destination, fileAt, isMissing, isPermissionError, isUnseen, sharedSkillPresent, type Blocker } from './paths.js';
 import { containsMarkers, sectionMarkers, updateSection } from './markers.js';
-import { isSkipped, PresetsError, SkipFileError, type SkipAction } from './types.js';
+import { isSkipped, PresetsError, SkipFileError, usesShared, type SkipAction } from './types.js';
 import type { FileAction, Plan } from './plan.js';
 import { commitFiles } from './writer-client.js';
 import { leftoverTemps } from './write-file.js';
@@ -105,7 +105,7 @@ function coverSharedCopies(entries: { file: FileAction; result: InstallResult }[
     .map(({ file }) => file.target));
   for (const { file, result } of entries) {
     if (!file.sharedSkill || !landed.has(`${file.sharedSkill}/SKILL.md`)) continue;
-    if (dryRun || isSkipped(result.action)) result.action = 'skipped (shared skill already present)';
+    if (dryRun || isSkipped(result.action)) result.action = usesShared(file.sharedSkill);
   }
 }
 
@@ -135,7 +135,7 @@ export async function install({ files: plan, unsupported }: Plan, cwd: string, d
   const checked = await Promise.all(plan.map(async (file) => {
     const blocker = blockers.get(file.target);
     let skip: SkipAction | undefined;
-    if (file.sharedSkill && shared.has(file.sharedSkill)) skip = 'skipped (shared skill already present)';
+    if (file.sharedSkill && shared.has(file.sharedSkill)) skip = usesShared(file.sharedSkill);
     else if (legacyCline && file.target.startsWith('.clinerules/')) skip = 'skipped (legacy .clinerules file)';
     // AGENTS.md -> CLAUDE.md and GEMINI.md -> AGENTS.md are common setups.
     else if (file.mode === 'section' && blocker === 'target') {

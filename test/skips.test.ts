@@ -93,7 +93,7 @@ describe.skipIf(!posixUser)('permission skips', () => {
     await lock(path.join(root, '.cursor'));
     const plan = createPlan([fixtureStack()], ['cursor', 'codex'], { only: 'skill' });
     expect(await install(plan, root, async () => content, { dryRun })).toEqual([
-      { path: '.cursor/skills/nextjs-code-review/SKILL.md', action: 'skipped (shared skill already present)' },
+      { path: '.cursor/skills/nextjs-code-review/SKILL.md', action: 'skipped (uses shared .agents/skills/nextjs-code-review)' },
       { path: '.agents/skills/nextjs-code-review/SKILL.md', action: dryRun ? 'would create' : 'created' },
     ]);
   });
@@ -239,7 +239,7 @@ describe('refusals found while writing', () => {
     expect(result).toEqual([{ path: '.cursor/skills/nextjs-code-review/SKILL.md', action: 'created' }]);
     await addSkill(path.join(root, '.agents/skills/nextjs-code-review'));
     const again = await install(createPlan([fixtureStack()], ['copilot'], { only: 'skill' }), root, async () => content);
-    expect(again).toEqual([{ path: '.github/skills/nextjs-code-review/SKILL.md', action: 'skipped (shared skill already present)' }]);
+    expect(again).toEqual([{ path: '.github/skills/nextjs-code-review/SKILL.md', action: 'skipped (uses shared .agents/skills/nextjs-code-review)' }]);
   });
 
   it.each([false, true])('judges the shared skill by its SKILL.md, not by supporting files (dryRun=%s)', async (dryRun) => {
@@ -262,19 +262,19 @@ describe('refusals found while writing', () => {
     await addSkill(path.join(root, '.cursor/skills/nextjs-code-review'));
     const plan = createPlan([fixtureStack()], ['cursor', 'codex'], { only: 'skill' });
     expect(await install(plan, root, async () => content, { dryRun, force })).toEqual([
-      { path: '.cursor/skills/nextjs-code-review/SKILL.md', action: 'skipped (shared skill already present)' },
+      { path: '.cursor/skills/nextjs-code-review/SKILL.md', action: 'skipped (uses shared .agents/skills/nextjs-code-review)' },
       { path: '.agents/skills/nextjs-code-review/SKILL.md', action: dryRun ? 'would create' : 'created' },
     ]);
     if (dryRun) return;
     expect(await readFile(path.join(root, '.cursor/skills/nextjs-code-review/SKILL.md'), 'utf8')).toBe('Shared skill');
-    expect((await install(plan, root, async () => content, { force }))[0].action).toBe('skipped (shared skill already present)');
+    expect((await install(plan, root, async () => content, { force }))[0].action).toBe('skipped (uses shared .agents/skills/nextjs-code-review)');
   });
 
   it.each([false, true])('writes .agents once and skips the tool copy when both are planned (dryRun=%s)', async (dryRun) => {
     const plan = createPlan([fixtureStack()], ['cursor', 'codex'], { only: 'skill' });
     const result = await install(plan, root, async () => content, { dryRun });
     expect(result).toEqual([
-      { path: '.cursor/skills/nextjs-code-review/SKILL.md', action: 'skipped (shared skill already present)' },
+      { path: '.cursor/skills/nextjs-code-review/SKILL.md', action: 'skipped (uses shared .agents/skills/nextjs-code-review)' },
       { path: '.agents/skills/nextjs-code-review/SKILL.md', action: dryRun ? 'would create' : 'created' },
     ]);
     await expect(stat(path.join(root, '.cursor'))).rejects.toMatchObject({ code: 'ENOENT' });

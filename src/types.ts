@@ -24,13 +24,16 @@ export class PresetsError extends Error {
   }
 }
 
-export type SkipAction = 'skipped (exists)' | 'skipped (shared skill already present)' | 'skipped (legacy .clinerules file)'
+export type SkipAction = 'skipped (exists)' | `skipped (uses shared ${string})` | 'skipped (legacy .clinerules file)'
   | 'skipped (needs a newer presets-dev)' | 'skipped (folder is a symlink)' | 'skipped (file is a symlink)' | 'skipped (file is hard-linked)'
   | 'skipped (AGENTS.md is a symlink)' | 'skipped (GEMINI.md is a symlink; use --agents-md)' | 'skipped (parent folder is a file)'
   | 'skipped (not a regular file)' | 'skipped (permission denied)' | 'skipped (malformed presets.dev markers)'
   | 'skipped (export contains presets.dev markers)' | 'skipped (unsupported text encoding)';
 
 export const isSkipped = (action: string): boolean => action.startsWith('skipped');
+
+// A tool's own skill copy left out because the tool reads the shared .agents/skills copy.
+export const usesShared = (sharedSkill: string): SkipAction => `skipped (uses shared ${sharedSkill})`;
 
 // A refusal that concerns one target only: it is reported as that file's
 // skip and the other files still install, as long as nothing was published.

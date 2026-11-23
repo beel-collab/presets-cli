@@ -29,6 +29,11 @@ const skillRoots: Record<Tool, string> = {
 
 type Resolved = Pick<FileAction, 'target' | 'mode' | 'sharedSkill' | 'skill'>;
 
+// Tools that also read skills from .agents/skills, the Codex and Antigravity
+// folder. Claude Code only reads .claude/skills.
+const SHARED_SKILL_READERS: readonly Tool[] = ['cursor', 'copilot', 'windsurf', 'cline', 'codex', 'antigravity'];
+const SHARED_SKILL_SOURCES: readonly Tool[] = ['codex', 'antigravity'];
+
 // Maps one export to its project path, or undefined when this CLI version does
 // not know the layout, so content can add layouts without breaking installs.
 // parseManifest already drops dangerous paths; the throw keeps that guarantee
@@ -46,8 +51,8 @@ function resolveExport(stack: string, entry: Entry, source: string, agentsMd: bo
     const tail = path.slice(root.length);
     // A skill folder may carry supporting files (references/, scripts/) next to SKILL.md.
     if (!path.startsWith(root) || !tail.includes('/')) return undefined;
-    const readsShared = entry.tool === 'cursor' || entry.tool === 'copilot' || entry.tool === 'windsurf';
     const skill = tail.split('/')[0];
+    const readsShared = SHARED_SKILL_READERS.includes(entry.tool) && !shared;
     return { target: path, mode: 'file', skill, ...(readsShared ? { sharedSkill: `.agents/skills/${skill}` } : {}) };
   }
   if (entry.tool === 'codex' || entry.tool === 'antigravity') {
@@ -68,10 +73,15 @@ const codexStandardsFirst = (entry: Entry) => Number(!(entry.tool === 'codex' &&
 export function createPlan(stacks: Stack[], tools: Tool[], options: PlanOptions = {}): Plan {
   const plan: Plan = { files: [], unsupported: [] };
   const keys = new Set<string>();
+  // Two or more tools that read .agents/skills share one copy there instead of
+  // each getting its own; their own copies are then skipped at install time.
+  const shareSkills = tools.filter((tool) => SHARED_SKILL_READERS.includes(tool)).length > 1;
+  const wanted = (entry: Entry) => tools.includes(entry.tool)
+    || (shareSkills && entry.role === 'skill' && SHARED_SKILL_SOURCES.includes(entry.tool));
   for (const stack of stacks) {
     const entries = options.agentsMd ? [...stack.entries].sort((a, b) => codexStandardsFirst(a) - codexStandardsFirst(b)) : stack.entries;
     for (const entry of entries) {
-      if (!tools.includes(entry.tool) || (options.only && entry.role !== options.only)) continue;
+      if (!wanted(entry) || (options.only && entry.role !== options.only)) continue;
       for (const source of entry.exports) {
         const resolved = resolveExport(stack.id, entry, source, Boolean(options.agentsMd));
         // Codex and Antigravity share skill exports, so both kinds are deduplicated.

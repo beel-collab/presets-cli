@@ -5,7 +5,7 @@ import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { safeRelative, isMissing, isPermissionError, sharedSkillPresent } from './paths.js';
 import { updateSection } from './markers.js';
-import { PresetsError, SkipFileError } from './types.js';
+import { PresetsError, SkipFileError, usesShared } from './types.js';
 import { appendExisting, leftoverTemps, liveExclusiveFiles, liveTemps, readExisting, sameFile, writeAtomic } from './write-file.js';
 import type { WriteRequest, WriteResponse } from './writer-client.js';
 
@@ -182,7 +182,7 @@ async function execute(request: WriteRequest, results: InstallResult[]): Promise
       // Before pinning, which creates folders the skipped copy doesn't need.
       if (file.sharedSkill) {
         if (!sharedSeen.has(file.sharedSkill)) sharedSeen.set(file.sharedSkill, await sharedSkillPresent(request.root, file.sharedSkill));
-        if (sharedSeen.get(file.sharedSkill)) { action = 'skipped (shared skill already present)'; continue; }
+        if (sharedSeen.get(file.sharedSkill)) { action = usesShared(file.sharedSkill); continue; }
       }
       const verifyParent = await pinParent(request, file.target);
       const name = path.posix.basename(file.target);

@@ -40,7 +40,7 @@ All paths are relative to your project directory. `<stack>` is the selected stac
 | `codex` | Marked section appended to `AGENTS.md` | `.agents/skills/<skill>/` |
 | `antigravity` | Marked section appended to `GEMINI.md` | `.agents/skills/<skill>/` |
 
-Skill folders contain `SKILL.md` and any supporting files provided by the preset. Codex and Antigravity share the `.agents/skills/` copy. Cursor, Copilot, and Windsurf skip their own copy when the shared skill's `SKILL.md` is already present or installed by the same command.
+Skill folders contain `SKILL.md` and any supporting files provided by the preset. Codex and Antigravity share the `.agents/skills/` copy. Cursor, Copilot, Windsurf, and Cline read that folder too: when two or more of these six tools are selected, the skill is written once to `.agents/skills/` and their own copies are skipped. Each of them also skips its own copy when the shared skill's `SKILL.md` is already there. Claude Code doesn't read `.agents/skills/`, so it always gets its own copy.
 
 When Codex and Antigravity are selected together, Antigravity's standards go to `AGENTS.md` once, because Antigravity CLI reads `AGENTS.md` as well as `GEMINI.md`. The Codex section is used. Pass `--gemini-md` to keep a separate `GEMINI.md` anyway. Use `--agents-md` to send Antigravity instructions to `AGENTS.md` when Codex isn't selected.
 

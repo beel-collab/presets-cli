@@ -100,7 +100,7 @@ Hard rules:
 1. **Windsurf installs only under `.devin/`.** Never also write to `.windsurf/`.
 2. **Never replace `AGENTS.md`, `GEMINI.md` or `CLAUDE.md`.** Append a marked section (see §6). Create the file if it's missing.
 3. **Antigravity:** append to `GEMINI.md` *or* `AGENTS.md`, never both.
-4. **Shared skill path:** Codex and Antigravity share `.agents/skills/<skill>/SKILL.md`; write it once even if both tools are selected. Cursor, Copilot and Devin also read `.agents/skills`, so if `.agents/skills/<skill>/SKILL.md` already exists, or this run writes it, skip their own copy and print a note (avoids duplicate skills with the same name). An empty or unsearchable skill folder doesn't count, so their own copy still installs.
+4. **Shared skill path:** Codex and Antigravity share `.agents/skills/<skill>/SKILL.md`; write it once even if both tools are selected. Cursor, Copilot, Devin and Cline also read `.agents/skills`. When two or more tools that read `.agents/skills` are selected, write the shared copy even if neither Codex nor Antigravity is selected. If `.agents/skills/<skill>/SKILL.md` already exists, or this run writes it, skip their own copy and print `skipped (uses shared .agents/skills/<skill>)` (avoids duplicate skills with the same name). An empty or unsearchable skill folder doesn't count, so their own copy still installs.
 5. **Never overwrite an existing file** unless `--force` is given. Report it as `skipped (exists)`.
 6. **Legacy Cline files:** if `.clinerules` is a file, preserve it and skip Cline standards with a note. Continue installing skills and presets for other selected tools, including with `--force`.
 7. **Shared AGENTS sections:** when Codex and Antigravity are both selected with `--agents-md`, use the Codex standards export regardless of manifest order. Antigravity alone uses its own export.
@@ -122,7 +122,7 @@ Installs one or more stacks.
 | `--cwd <dir>` | Project root (default: current directory). |
 | `-y, --yes` | Don't prompt; with no tool detected, fail with a helpful message. |
 
-Output: one line per file with its action (`created`, `appended`, `skipped (exists)`, `skipped (shared skill already present)`, `would create` in dry-run), then a summary line and a link to the stack page `https://presets.dev/<tool>/...` if cheap to build, otherwise `https://presets.dev`.
+Output: one line per file with its action (`created`, `appended`, `skipped (exists)`, `skipped (uses shared .agents/skills/<skill>)`, `would create` in dry-run), then a summary line and a link to the stack page `https://presets.dev/<tool>/...` if cheap to build, otherwise `https://presets.dev`.
 
 ### `list`
 Prints installable stacks: id, plus the skill name per stack. `--json` prints machine-readable output. `--tool <tool>` filters to entries for one tool.
