@@ -1,7 +1,7 @@
 import { access, lstat, stat, readFile, realpath } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import path from 'node:path';
-import { blockerOnPath, destination, fileAt, isMissing, isPermissionError, isUnseen, sharedSkillPresent, type Blocker } from './paths.js';
+import { blockerOnPath, classifyPath, destination, fileAt, isMissing, isPermissionError, isUnseen, sharedSkillPresent, type Blocker } from './paths.js';
 import { containsMarkers, sectionMarkers, updateSection } from './markers.js';
 import { isSkipped, PresetsError, SkipFileError, usesShared, type SkipAction } from './types.js';
 import type { FileAction, Plan } from './plan.js';
@@ -109,10 +109,55 @@ function coverSharedCopies(entries: { file: FileAction; result: InstallResult }[
   }
 }
 
-export async function install({ files: plan, unsupported }: Plan, cwd: string, download: Download, options: InstallOptions = {}): Promise<InstallResult[]> {
+// Where a project path really lives once its links are followed, when every
+// link on the way stays inside the project. Undefined for links that leave it,
+// dangle, or loop.
+async function realTarget(root: string, relative: string): Promise<string | undefined> {
+  const parts = relative.split('/');
+  for (let count = parts.length; count > 0; count--) {
+    let real: string;
+    try { real = await realpath(path.join(root, ...parts.slice(0, count))); }
+    catch (error) { if (isUnseen(error)) continue; throw error; }
+    const inside = path.relative(root, real);
+    if (!inside || inside === '..' || inside.startsWith(`..${path.sep}`) || path.isAbsolute(inside)) return undefined;
+    const target = [...inside.split(path.sep), ...parts.slice(count)].join('/');
+    return classifyPath(target) === 'safe' ? target : undefined;
+  }
+  return undefined;
+}
+
+// AGENTS.md -> CLAUDE.md and .claude/skills -> .agents/skills are common
+// setups. A link that stays inside the project is followed here, so the
+// writer, which refuses every symlink, writes the real file at its real path.
+// Following links can make two planned files one; the later one is skipped.
+async function followProjectLinks(root: string, planned: FileAction[]) {
+  const viaLink = new Map<FileAction, string>();
+  const plan = await Promise.all(planned.map(async (file) => {
+    const blocker = await blockerOnPath(root, file.target);
+    if (blocker !== 'parent' && !(blocker === 'target' && file.mode === 'section')) return file;
+    const real = await realTarget(root, file.target);
+    if (!real || real === file.target || await blockerOnPath(root, real)) return file;
+    const followed = { ...file, target: real };
+    viaLink.set(followed, file.target);
+    return followed;
+  }));
+  const shown = (file: FileAction) => viaLink.has(file) ? `${viaLink.get(file)} -> ${file.target}` : file.target;
+  const first = new Map<string, FileAction>();
+  const duplicates = new Map<FileAction, SkipAction>();
+  for (const file of plan) {
+    const key = `${file.target}:${file.mode === 'section' ? file.stack : ''}`;
+    const earlier = first.get(key);
+    if (earlier) duplicates.set(file, `skipped (same file as ${shown(earlier)})`);
+    else first.set(key, file);
+  }
+  return { plan, shown, duplicates };
+}
+
+export async function install({ files: planned, unsupported }: Plan, cwd: string, download: Download, options: InstallOptions = {}): Promise<InstallResult[]> {
   const root = await realpath(cwd);
   const identity = await lstat(root);
   if (!identity.isDirectory()) throw new PresetsError(`Not a project directory: ${cwd}`);
+  const { plan, shown, duplicates } = await followProjectLinks(root, planned);
   // Writes through a symlink, under a file or onto a non-file are refused, so
   // such a target is skipped rather than failing the other tools' installs;
   // the writer still refuses at write time. Blockers are found once per
@@ -134,10 +179,11 @@ export async function install({ files: plan, unsupported }: Plan, cwd: string, d
   const reads = new Map<string, Promise<Existing | undefined>>();
   const checked = await Promise.all(plan.map(async (file) => {
     const blocker = blockers.get(file.target);
-    let skip: SkipAction | undefined;
-    if (file.sharedSkill && shared.has(file.sharedSkill)) skip = usesShared(file.sharedSkill);
+    let skip: SkipAction | undefined = duplicates.get(file);
+    if (skip) { /* already written through another planned path */ }
+    else if (file.sharedSkill && shared.has(file.sharedSkill)) skip = usesShared(file.sharedSkill);
     else if (legacyCline && file.target.startsWith('.clinerules/')) skip = 'skipped (legacy .clinerules file)';
-    // AGENTS.md -> CLAUDE.md and GEMINI.md -> AGENTS.md are common setups.
+    // Links inside the project were followed above; these leave it, dangle, or loop.
     else if (file.mode === 'section' && blocker === 'target') {
       skip = file.target === 'GEMINI.md' ? 'skipped (GEMINI.md is a symlink; use --agents-md)' : 'skipped (AGENTS.md is a symlink)';
     }
@@ -177,7 +223,7 @@ export async function install({ files: plan, unsupported }: Plan, cwd: string, d
       else if (existing && existing.links > 1) action = 'skipped (file is hard-linked)';
     }
     if (updated !== undefined && !isSkipped(action)) virtual.set(file.target, Buffer.from(updated, 'latin1'));
-    const result: InstallResult = { path: file.target, action };
+    const result: InstallResult = { path: shown(file), action };
     results.push(result);
     entries.push({ file, result });
     if (!isSkipped(action)) pending.push({ file, result });

@@ -24,7 +24,7 @@ export class PresetsError extends Error {
   }
 }
 
-export type SkipAction = 'skipped (exists)' | `skipped (uses shared ${string})` | 'skipped (legacy .clinerules file)'
+export type SkipAction = 'skipped (exists)' | `skipped (uses shared ${string})` | `skipped (same file as ${string})` | 'skipped (legacy .clinerules file)'
   | 'skipped (needs a newer presets-dev)' | 'skipped (folder is a symlink)' | 'skipped (file is a symlink)' | 'skipped (file is hard-linked)'
   | 'skipped (AGENTS.md is a symlink)' | 'skipped (GEMINI.md is a symlink; use --agents-md)' | 'skipped (parent folder is a file)'
   | 'skipped (not a regular file)' | 'skipped (permission denied)' | 'skipped (malformed presets.dev markers)'

@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile, stat, chmod, rename, realpath, link, utimes } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile, stat, chmod, rename, realpath, link, utimes, lstat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -655,15 +655,61 @@ describe('installer', () => {
     } finally { await rm(outside, { recursive: true, force: true }); }
   });
 
-  it('skips a symlinked GEMINI.md with a hint and installs the other tools', async () => {
-    await writeFile(path.join(root, 'AGENTS.md'), 'Personal\n');
-    await symlink('AGENTS.md', path.join(root, 'GEMINI.md'));
-    const plan = createPlan([fixtureStack()], ['cursor', 'antigravity'], { only: 'standards' });
+  it.each([
+    { link: 'AGENTS.md', real: 'CLAUDE.md', tool: 'codex' as const },
+    { link: 'GEMINI.md', real: 'AGENTS.md', tool: 'antigravity' as const },
+  ])('appends through $link when it links to $real inside the project', async ({ link, real, tool }) => {
+    await writeFile(path.join(root, real), 'Personal\r\n');
+    await symlink(real, path.join(root, link));
+    const plan = createPlan([fixtureStack()], ['cursor', tool], { only: 'standards' });
+    expect(await install(plan, root, async () => content, { dryRun: true })).toContainEqual({ path: `${link} -> ${real}`, action: 'would append' });
     expect(await install(plan, root, async () => content)).toEqual([
       { path: '.cursor/rules/nextjs-rules.mdc', action: 'created' },
-      { path: 'GEMINI.md', action: 'skipped (GEMINI.md is a symlink; use --agents-md)' },
+      { path: `${link} -> ${real}`, action: 'appended' },
     ]);
-    expect(await readFile(path.join(root, 'AGENTS.md'), 'utf8')).toBe('Personal\n');
+    const text = await readFile(path.join(root, real), 'utf8');
+    expect(text.startsWith('Personal\r\n')).toBe(true);
+    expect(text.match(/nextjs:start/g)).toHaveLength(1);
+    expect((await lstat(path.join(root, link))).isSymbolicLink()).toBe(true);
+    expect((await install(plan, root, async () => content))[1]).toEqual({ path: `${link} -> ${real}`, action: 'skipped (exists)' });
+  });
+
+  it('writes one section when Codex and Antigravity reach the same file through a link', async () => {
+    await writeFile(path.join(root, 'AGENTS.md'), 'Personal\n');
+    await symlink('AGENTS.md', path.join(root, 'GEMINI.md'));
+    const plan = createPlan([fixtureStack()], ['codex', 'antigravity'], { only: 'standards' });
+    expect(await install(plan, root, async () => content)).toEqual([
+      { path: 'AGENTS.md', action: 'appended' },
+      { path: 'GEMINI.md -> AGENTS.md', action: 'skipped (same file as AGENTS.md)' },
+    ]);
+    expect((await readFile(path.join(root, 'AGENTS.md'), 'utf8')).match(/nextjs:start/g)).toHaveLength(1);
+  });
+
+  it('follows a skills folder link inside the project and writes the skill once', async () => {
+    await mkdir(path.join(root, '.agents/skills'), { recursive: true });
+    await mkdir(path.join(root, '.claude'));
+    await symlink('../.agents/skills', path.join(root, '.claude/skills'), 'dir');
+    const plan = createPlan([fixtureStack()], ['claude', 'codex'], { only: 'skill' });
+    expect(await install(plan, root, async () => content)).toEqual([
+      { path: '.claude/skills/nextjs-code-review/SKILL.md -> .agents/skills/nextjs-code-review/SKILL.md', action: 'created' },
+      { path: '.agents/skills/nextjs-code-review/SKILL.md', action: 'skipped (same file as .claude/skills/nextjs-code-review/SKILL.md -> .agents/skills/nextjs-code-review/SKILL.md)' },
+    ]);
+    expect(await readFile(path.join(root, '.agents/skills/nextjs-code-review/SKILL.md'))).toEqual(content);
+    expect((await lstat(path.join(root, '.claude/skills'))).isSymbolicLink()).toBe(true);
+  });
+
+  it('still skips a GEMINI.md that links outside the project, with a hint', async () => {
+    const outside = await mkdtemp(path.join(os.tmpdir(), 'presets-outside-'));
+    try {
+      await writeFile(path.join(outside, 'GEMINI.md'), 'Personal\n');
+      await symlink(path.join(outside, 'GEMINI.md'), path.join(root, 'GEMINI.md'));
+      const plan = createPlan([fixtureStack()], ['cursor', 'antigravity'], { only: 'standards' });
+      expect(await install(plan, root, async () => content)).toEqual([
+        { path: '.cursor/rules/nextjs-rules.mdc', action: 'created' },
+        { path: 'GEMINI.md', action: 'skipped (GEMINI.md is a symlink; use --agents-md)' },
+      ]);
+      expect(await readFile(path.join(outside, 'GEMINI.md'), 'utf8')).toBe('Personal\n');
+    } finally { await rm(outside, { recursive: true, force: true }); }
   });
 
   it.each(['in-place', 'atomic'])('aborts a forced replacement after a concurrent $style editor save', async (style) => {

@@ -181,6 +181,7 @@ Look in `--cwd` for these signals:
 
 - Only write inside `--cwd`. Reject any computed path that escapes it (after normalising) or is absolute.
 - Read-only checks for existing files and shared skills may follow symlinks. Paths that will be written must not contain symlinks.
+- A link on a target's path that stays inside the project (`AGENTS.md -> CLAUDE.md`, `GEMINI.md -> AGENTS.md`, `.claude/skills -> ../.agents/skills`) is followed before writing: the real file is written at its real path and the output shows `AGENTS.md -> CLAUDE.md`. If two planned files turn out to be the same file, the later one prints `skipped (same file as <path>)`. Links that leave the project, dangle, or loop are still skipped.
 - A problem with one target is reported for that file and the other files still install:
   - a parent folder that is a regular file (for example a `.github` file): `skipped (parent folder is a file)`;
   - a folder or other non-file where a file should be: `skipped (not a regular file)`;
