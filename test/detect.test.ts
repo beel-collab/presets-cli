@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import prompts from 'prompts';
-import { chooseTools, detectTools, NO_TOOL_MESSAGE, SIGNALS } from '../src/detect.js';
+import { chooseTools, detectTools, NO_TOOL_MESSAGE, severalToolsMessage, SIGNALS } from '../src/detect.js';
 import { TOOLS } from '../src/types.js';
 
 vi.mock('prompts', () => ({ default: vi.fn() }));
@@ -41,11 +41,12 @@ describe('tool detection', () => {
     await mkdir(path.join(root, '.cursor'));
     expect(await detectTools(root)).toEqual(['cursor']);
   });
-  it('selects all detected tools with --yes or in a non-TTY', async () => {
+  it('selects all detected tools with --yes, but asks for a choice in a non-TTY', async () => {
     await mkdir(path.join(root, '.cursor'));
     await writeFile(path.join(root, 'AGENTS.md'), '');
     expect(await chooseTools(root, true, true)).toEqual(['cursor', 'codex']);
-    expect(await chooseTools(root, false, false)).toEqual(['cursor', 'codex']);
+    expect(await chooseTools(root, true, false)).toEqual(['cursor', 'codex']);
+    await expect(chooseTools(root, false, false)).rejects.toThrow(severalToolsMessage(['cursor', 'codex']));
   });
   it('fails without detected tools for --yes or a non-TTY', async () => {
     await expect(chooseTools(root, true, true)).rejects.toThrow(NO_TOOL_MESSAGE);

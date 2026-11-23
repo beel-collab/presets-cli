@@ -42,7 +42,7 @@ All paths are relative to your project directory. `<stack>` is the selected stac
 
 Skill folders contain `SKILL.md` and any supporting files provided by the preset. Codex and Antigravity share the `.agents/skills/` copy. Cursor, Copilot, and Windsurf skip their own copy when the shared skill's `SKILL.md` is already present or installed by the same command.
 
-Use `--agents-md` to send Antigravity instructions to `AGENTS.md`. When Codex and Antigravity are selected together with this flag, the Codex section is used once.
+When Codex and Antigravity are selected together, Antigravity's standards go to `AGENTS.md` once, because Antigravity CLI reads `AGENTS.md` as well as `GEMINI.md`. The Codex section is used. Pass `--gemini-md` to keep a separate `GEMINI.md` anyway. Use `--agents-md` to send Antigravity instructions to `AGENTS.md` when Codex isn't selected.
 
 Existing files and installed sections are skipped by default. Instruction sections preserve the surrounding text and line endings. `--force` replaces eligible preset files or the contents of an existing marked section. Use `--dry-run` to preview the paths and actions before installing.
 
@@ -56,7 +56,8 @@ Existing files and installed sections are skipped by default. Instruction sectio
 | `--only <role>` | Install `standards` or `skill`. Both are installed by default. |
 | `--dry-run` | Preview the install plan. |
 | `--force` | Replace existing preset files or marked sections. |
-| `--agents-md` | Append Antigravity instructions to `AGENTS.md`. |
+| `--agents-md` | Append Antigravity instructions to `AGENTS.md`. This is the default when Codex is also selected. |
+| `--gemini-md` | Keep Antigravity instructions in `GEMINI.md` even when Codex is selected. |
 | `--ref <ref>` | Fetch content from a Git branch, tag, or commit. Defaults to `master`. |
 | `--cwd <dir>` | Set the project directory. Defaults to the current directory. |
 | `-y, --yes` | Accept detected tools without prompting. Supply `--tool` if none are detected. |

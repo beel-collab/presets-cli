@@ -13,7 +13,7 @@ import { PartialInstallError } from './writer-client.js';
 import { isSkipped, PresetsError, parseTools, type Role } from './types.js';
 
 interface AddOptions {
-  tool?: string; only?: Role; dryRun?: boolean; force?: boolean; agentsMd?: boolean;
+  tool?: string; only?: Role; dryRun?: boolean; force?: boolean; agentsMd?: boolean; geminiMd?: boolean;
   ref: string; cwd: string; yes?: boolean;
 }
 
@@ -29,6 +29,7 @@ program.command('add').description('Install one or more stacks').argument('<stac
   .option('--dry-run', 'Print the plan without writing files')
   .option('--force', 'Replace existing preset files or marked sections')
   .option('--agents-md', 'Append Antigravity standards to AGENTS.md')
+  .option('--gemini-md', 'Keep Antigravity standards in GEMINI.md even when Codex is selected')
   .option('--ref <ref>', 'Content git ref', DEFAULT_REF)
   .option('--cwd <dir>', 'Project root', process.cwd())
   .option('-y, --yes', 'Use detected tools without prompting')
@@ -48,6 +49,15 @@ program.command('add').description('Install one or more stacks').argument('<stac
     });
     const explicit = options.tool === undefined ? undefined : parseTools(options.tool);
     const tools = explicit ?? await chooseTools(options.cwd, options.yes);
+    if (options.agentsMd && options.geminiMd) throw new PresetsError('Pass either --agents-md or --gemini-md, not both.');
+    // Antigravity reads AGENTS.md as well as GEMINI.md, so with Codex selected a
+    // GEMINI.md copy would load the same standards twice.
+    const shareAgentsMd = !options.agentsMd && !options.geminiMd && options.only !== 'skill'
+      && tools.includes('codex') && tools.includes('antigravity');
+    if (shareAgentsMd) {
+      options.agentsMd = true;
+      console.log(pc.dim('Antigravity CLI reads AGENTS.md too, so its standards go there once. Pass --gemini-md for a separate GEMINI.md.'));
+    }
     const client = new ContentClient(options.ref);
     const manifest = await loadManifest(client);
     const stacks = selectStacks(manifest, ids);

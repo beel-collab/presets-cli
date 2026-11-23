@@ -10,6 +10,8 @@ export const SIGNALS: Record<Tool, string[]> = {
   cline: ['.clinerules', '.cline'], codex: ['AGENTS.md', '.codex'], antigravity: ['GEMINI.md', '.gemini'],
 };
 export const NO_TOOL_MESSAGE = `No AI tool detected. Pass --tool <${TOOLS.join('|')}>.`;
+export const severalToolsMessage = (detected: Tool[]) =>
+  `Detected ${detected.join(', ')}. Pass --tool <tool,...> to choose, or --yes to install for all of them.`;
 
 export async function detectTools(root: string): Promise<Tool[]> {
   const detected = await Promise.all(TOOLS.map(async (tool) => {
@@ -31,7 +33,10 @@ export async function detectTools(root: string): Promise<Tool[]> {
 
 export async function chooseTools(root: string, yes = false, interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY)): Promise<Tool[]> {
   const detected = await detectTools(root);
-  if (detected.length === 1 || (detected.length > 1 && (yes || !interactive))) return detected;
+  if (detected.length === 1 || (detected.length > 1 && yes)) return detected;
+  // Without a terminal there is no one to confirm several tools, so writing
+  // files for all of them would surprise scripts and CI.
+  if (detected.length > 1 && !interactive) throw new PresetsError(severalToolsMessage(detected));
   if (!interactive || yes) throw new PresetsError(NO_TOOL_MESSAGE);
   const result = await prompts({
     type: 'multiselect', name: 'tools', message: 'Install presets for which tools?', min: 1,

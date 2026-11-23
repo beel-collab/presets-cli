@@ -116,7 +116,8 @@ Installs one or more stacks.
 | `--only <standards\|skill>` | Install just one role (default: both). |
 | `--dry-run` | Print the plan (paths and actions), write nothing. |
 | `--force` | Overwrite existing files and replace an existing marked section. |
-| `--agents-md` | For antigravity, append to `AGENTS.md` instead of `GEMINI.md`. |
+| `--agents-md` | For antigravity, append to `AGENTS.md` instead of `GEMINI.md`. Default when codex is also selected. |
+| `--gemini-md` | For antigravity, keep `GEMINI.md` even when codex is selected. Can't be combined with `--agents-md`. |
 | `--ref <ref>` | Content git ref (default `master`). |
 | `--cwd <dir>` | Project root (default: current directory). |
 | `-y, --yes` | Don't prompt; with no tool detected, fail with a helpful message. |
@@ -163,7 +164,7 @@ Look in `--cwd` for these signals:
 | antigravity | `GEMINI.md` or `.gemini/` |
 
 - One detected: use it.
-- Several detected: interactive multi-select of all 7 tools, with detected tools preselected; with `--yes`, use all detected tools.
+- Several detected: interactive multi-select of all 7 tools, with detected tools preselected; with `--yes`, use all detected tools; in a non-TTY without `--yes`, exit 1 listing the detected tools and asking for `--tool` or `--yes`.
 - None: interactive single/multi-select of all 7; with `--yes` or a non-TTY, exit 1 with "No AI tool detected. Pass --tool <cursor|copilot|claude|windsurf|cline|codex|antigravity>."
 
 ## 8. Errors and exit codes
@@ -226,7 +227,7 @@ Verified locally against the live content and the packed npm tarball. Registry p
 - [x] `add nextjs --tool cursor` in an empty dir creates `.cursor/rules/nextjs-rules.mdc` and `.cursor/skills/nextjs-code-review/SKILL.md`, byte-identical to the export files.
 - [x] Same check passes for copilot, claude, windsurf (`.devin/` only; nothing under `.windsurf/`) and cline.
 - [x] `add nextjs --tool codex` with an existing `AGENTS.md` keeps its original content and appends one marked section; re-running changes nothing.
-- [x] `add nextjs --tool codex,antigravity` writes `.agents/skills/nextjs-code-review/SKILL.md` once and appends to `AGENTS.md` and `GEMINI.md` respectively.
+- [x] `add nextjs --tool codex,antigravity` writes `.agents/skills/nextjs-code-review/SKILL.md` once and appends one section to `AGENTS.md` (with `--gemini-md`: to `AGENTS.md` and `GEMINI.md` respectively).
 - [x] `--agents-md` sends antigravity's section to `AGENTS.md`, not `GEMINI.md`, and doesn't duplicate if codex's section is already there for that stack.
 - [x] A CRLF `AGENTS.md` stays CRLF after appending.
 - [x] Existing files are skipped without `--force` and replaced with it.

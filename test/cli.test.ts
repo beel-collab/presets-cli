@@ -68,6 +68,29 @@ describe('built CLI', () => {
     expect(await readFile(path.join(root, 'AGENTS.md'), 'utf8')).toBe(first);
     expect(await readdir(root)).not.toContain('GEMINI.md');
   });
+  it('sends Antigravity standards to AGENTS.md once when Codex is selected, unless --gemini-md', async () => {
+    const shared = await run(['add', 'nextjs', '--tool', 'codex,antigravity', '--only', 'standards']);
+    expect(shared.code).toBe(0);
+    expect(shared.stdout).toContain('Antigravity CLI reads AGENTS.md too');
+    expect((await readFile(path.join(root, 'AGENTS.md'), 'utf8')).match(/nextjs:start/g)).toHaveLength(1);
+    expect(await readdir(root)).not.toContain('GEMINI.md');
+    const separate = await run(['add', 'nextjs', '--tool', 'codex,antigravity', '--only', 'standards', '--gemini-md']);
+    expect(separate.stdout).not.toContain('Antigravity CLI reads AGENTS.md too');
+    expect(await readFile(path.join(root, 'GEMINI.md'), 'utf8')).toContain('nextjs:start');
+    const both = await run(['add', 'nextjs', '--tool', 'antigravity', '--agents-md', '--gemini-md']);
+    expect(both.code).toBe(1);
+    expect(both.stderr).toContain('either --agents-md or --gemini-md');
+  });
+  it('asks for --tool or --yes when several tools are detected without a terminal', async () => {
+    await mkdir(path.join(root, '.cursor'));
+    await mkdir(path.join(root, '.claude'));
+    const result = await run(['add', 'nextjs']);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('Detected cursor, claude. Pass --tool <tool,...> to choose, or --yes');
+    expect(await readdir(path.join(root, '.cursor'))).toEqual([]);
+    expect((await run(['add', 'nextjs', '--yes', '--only', 'standards'])).code).toBe(0);
+    expect(await readdir(path.join(root, '.claude'))).toEqual(['rules']);
+  });
   it('exits 1 for unknown ids, invalid roles, and no-tool --yes', async () => {
     expect((await run(['add', 'nextj', '--tool', 'cursor'])).stderr).toContain('Did you mean nextjs');
     const badTool = await run(['add', 'nextjs', '--tool', 'bad']);
