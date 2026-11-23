@@ -4,7 +4,7 @@ import pc from 'picocolors';
 import { access, stat } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import packageInfo from '../package.json' with { type: 'json' };
-import { ContentClient } from './fetch.js';
+import { ContentClient, DEFAULT_REF } from './fetch.js';
 import { listStacks, loadManifest, selectStacks } from './manifest.js';
 import { createPlan } from './plan.js';
 import { install, type InstallResult } from './install.js';
@@ -29,7 +29,7 @@ program.command('add').description('Install one or more stacks').argument('<stac
   .option('--dry-run', 'Print the plan without writing files')
   .option('--force', 'Replace existing preset files or marked sections')
   .option('--agents-md', 'Append Antigravity standards to AGENTS.md')
-  .option('--ref <ref>', 'Content git ref', 'main')
+  .option('--ref <ref>', 'Content git ref', DEFAULT_REF)
   .option('--cwd <dir>', 'Project root', process.cwd())
   .option('-y, --yes', 'Use detected tools without prompting')
   .action(async (ids: string[], options: AddOptions) => {
@@ -61,7 +61,7 @@ program.command('add').description('Install one or more stacks').argument('<stac
 program.command('list').description('List installable stacks and their skills')
   .option('--json', 'Print machine-readable JSON')
   .option('-t, --tool <tool>', 'Filter to one tool')
-  .option('--ref <ref>', 'Content git ref', 'main')
+  .option('--ref <ref>', 'Content git ref', DEFAULT_REF)
   .action(async (options: { json?: boolean; tool?: string; ref: string }) => {
     const tools = options.tool === undefined ? undefined : parseTools(options.tool);
     if (tools && tools.length !== 1) throw new PresetsError('list --tool accepts exactly one tool.');

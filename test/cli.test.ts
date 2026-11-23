@@ -17,7 +17,7 @@ let fixture: { ref: string; manifestPath: string; manifest: ReturnType<typeof fi
 beforeEach(async () => {
   root = await mkdtemp(path.join(os.tmpdir(), 'presets-cli-'));
   config = path.join(root, 'fixture.json');
-  fixture = { ref: 'main', manifestPath: 'release/original-2026-11/stacks.json', manifest: fixtureManifest() };
+  fixture = { ref: 'master', manifestPath: 'release/original-2026-11/stacks.json', manifest: fixtureManifest() };
 });
 afterEach(async () => { await rm(root, { recursive: true, force: true }); });
 
@@ -110,7 +110,7 @@ describe('built CLI', () => {
     fixture.fail = fixture.manifest.stacks[0].entries[1].exports[0];
     const result = await run(['add', 'nextjs', '--tool', 'cursor']);
     expect(result.code).toBe(2);
-    expect(result.stderr).toContain(`https://raw.githubusercontent.com/beel-collab/presets.dev/main/${fixture.fail}`);
+    expect(result.stderr).toContain(`https://raw.githubusercontent.com/beel-collab/presets.dev/master/${fixture.fail}`);
     expect(await readdir(root)).toEqual(['fixture.json']);
   });
   it('rejects a malicious manifest before writing', async () => {

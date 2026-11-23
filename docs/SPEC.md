@@ -54,7 +54,7 @@ See [DEVELOPMENT.md](../DEVELOPMENT.md) for test coverage and dependency constra
 Content lives in the public repo **`beel-collab/presets.dev`**. The CLI reads it over HTTPS (no git clone):
 
 - Base URL: `https://raw.githubusercontent.com/beel-collab/presets.dev/<ref>/`
-- `<ref>` defaults to `main`; `--ref <tag|sha>` overrides it (useful for pinning and tests).
+- `<ref>` defaults to `master`; `--ref <tag|sha>` overrides it (useful for pinning and tests).
 - **Manifest:** `release/original-2026-11/stacks.json`, with top-level keys `release`, `tools`, `note` and `stacks`. Each stack:
 
 ```json
@@ -117,7 +117,7 @@ Installs one or more stacks.
 | `--dry-run` | Print the plan (paths and actions), write nothing. |
 | `--force` | Overwrite existing files and replace an existing marked section. |
 | `--agents-md` | For antigravity, append to `AGENTS.md` instead of `GEMINI.md`. |
-| `--ref <ref>` | Content git ref (default `main`). |
+| `--ref <ref>` | Content git ref (default `master`). |
 | `--cwd <dir>` | Project root (default: current directory). |
 | `-y, --yes` | Don't prompt; with no tool detected, fail with a helpful message. |
 

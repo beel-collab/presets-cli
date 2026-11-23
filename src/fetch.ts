@@ -3,6 +3,8 @@ import { PresetsError } from './types.js';
 
 export const RAW_BASE = 'https://raw.githubusercontent.com/beel-collab/presets.dev/';
 export const MANIFEST_PATH = 'release/original-2026-11/stacks.json';
+// The content repo's default branch. Its old name, main, only works through GitHub's rename redirect.
+export const DEFAULT_REF = 'master';
 
 function validateRef(ref: string): void {
   const invalidPart = ref.split('/').some((part) => !part || part.startsWith('.') || part.endsWith('.lock'));
@@ -13,7 +15,7 @@ function validateRef(ref: string): void {
 }
 
 export class ContentClient {
-  constructor(private readonly ref = 'main', private readonly request: typeof fetch = fetch) {
+  constructor(private readonly ref = DEFAULT_REF, private readonly request: typeof fetch = fetch) {
     validateRef(ref);
   }
 

@@ -57,7 +57,7 @@ Existing files and installed sections are skipped by default. Instruction sectio
 | `--dry-run` | Preview the install plan. |
 | `--force` | Replace existing preset files or marked sections. |
 | `--agents-md` | Append Antigravity instructions to `AGENTS.md`. |
-| `--ref <ref>` | Fetch content from a Git branch, tag, or commit. Defaults to `main`. |
+| `--ref <ref>` | Fetch content from a Git branch, tag, or commit. Defaults to `master`. |
 | `--cwd <dir>` | Set the project directory. Defaults to the current directory. |
 | `-y, --yes` | Accept detected tools without prompting. Supply `--tool` if none are detected. |
 
