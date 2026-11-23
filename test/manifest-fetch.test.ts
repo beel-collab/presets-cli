@@ -13,6 +13,7 @@ describe('manifest and HTTP boundary', () => {
     manifest.stacks[1].entries = manifest.stacks[1].entries.filter((entry) => entry.tool !== 'cursor');
     expect(listStacks(manifest, 'cursor')).toHaveLength(1);
     expect(() => selectStacks(manifest, ['nextj'])).toThrow(/Did you mean nextjs.*presets-dev list/);
+    expect(() => selectStacks(manifest, ['zzz'])).toThrow(/^Unknown stack "zzz"\. Run presets-dev list\.$/);
     expect(() => selectStacks(manifest, ['unfinished'])).toThrow('not complete');
     expect(selectStacks(manifest, ['nextjs', 'nextjs'])).toHaveLength(1);
   });

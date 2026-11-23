@@ -49,6 +49,15 @@ describe('built CLI', () => {
     expect(await readFile(path.join(root, '.cursor/rules/nextjs-rules.mdc'), 'utf8')).toBe('Synthetic native export\n');
     expect(await readdir(path.join(root, '.cursor'))).toEqual(['rules']);
     expect(result.stdout).toContain('2 file action(s)');
+    expect(result.stdout).toContain('https://presets.dev/browse?tag=nextjs&tag=react');
+  });
+  it('warns when AGENTS.md gets close to the size Codex reads', async () => {
+    await writeFile(path.join(root, 'AGENTS.md'), `${'Personal guidance line.\n'.repeat(1250)}`);
+    const large = await run(['add', 'nextjs', '--tool', 'codex', '--only', 'standards']);
+    expect(large.code).toBe(0);
+    expect(large.stdout).toMatch(/AGENTS\.md is 29\.\d KiB\. Codex reads the first 32 KiB by default/);
+    await rm(path.join(root, 'AGENTS.md'));
+    expect((await run(['add', 'nextjs', '--tool', 'codex', '--only', 'standards'])).stdout).not.toContain('KiB');
   });
   it('prints a full dry run without any install writes', async () => {
     const result = await run(['add', 'nextjs', '--tool', 'cursor', '--dry-run']);

@@ -3,6 +3,7 @@ import { Command, Option } from 'commander';
 import pc from 'picocolors';
 import { access, stat } from 'node:fs/promises';
 import { constants } from 'node:fs';
+import path from 'node:path';
 import packageInfo from '../package.json' with { type: 'json' };
 import { ContentClient, DEFAULT_REF } from './fetch.js';
 import { listStacks, loadManifest, selectStacks } from './manifest.js';
@@ -19,6 +20,26 @@ interface AddOptions {
 
 function printResults(results: InstallResult[]): void {
   for (const result of results) console.log(`${isSkipped(result.action) ? pc.dim(result.action) : pc.green(result.action)} ${result.path}`);
+}
+
+// The site has no per-stack page yet; the browse filter is the closest link.
+// Kept in one place so it can move to /stacks/<stack> later.
+function stackUrl(stacks: string[]): string {
+  const query = new URLSearchParams(stacks.map((stack) => ['tag', stack]));
+  return `https://presets.dev/browse?${query}`;
+}
+
+// Codex reads AGENTS.md up to 32 KiB by default and ignores the rest.
+const CODEX_LIMIT = 32 * 1024;
+const WARN_AT = 28 * 1024;
+
+async function warnLargeAgentsMd(cwd: string, results: InstallResult[]): Promise<void> {
+  const wrote = results.some((result) => /^AGENTS\.md( ->|$)/.test(result.path) && !isSkipped(result.action));
+  if (!wrote) return;
+  // stat follows AGENTS.md -> CLAUDE.md, which is the file Codex actually reads.
+  const size = await stat(path.join(cwd, 'AGENTS.md')).then((info) => info.size, () => 0);
+  if (size <= WARN_AT) return;
+  console.log(pc.yellow(`AGENTS.md is ${(size / 1024).toFixed(1)} KiB. Codex reads the first ${CODEX_LIMIT / 1024} KiB by default, so later sections may be cut off. Install fewer stacks, or use --only skill for some.`));
 }
 
 const program = new Command().name('presets-dev').description('Install presets.dev rules and skills for your AI coding tools.').version(packageInfo.version);
@@ -64,8 +85,9 @@ program.command('add').description('Install one or more stacks').argument('<stac
     const plan = createPlan(stacks, tools, options);
     const results = await install(plan, options.cwd, (source) => client.download(source), options);
     printResults(results);
+    if (!options.dryRun) await warnLargeAgentsMd(options.cwd, results);
     const skipped = results.filter((result) => isSkipped(result.action)).length;
-    console.log(`${options.dryRun ? 'Dry run: ' : ''}${results.length - skipped} file action(s), ${skipped} skipped. https://presets.dev`);
+    console.log(`${options.dryRun ? 'Dry run: ' : ''}${results.length - skipped} file action(s), ${skipped} skipped. ${stackUrl(stacks.map((stack) => stack.id))}`);
   });
 
 program.command('list').description('List installable stacks and their skills')

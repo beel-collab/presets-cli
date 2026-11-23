@@ -87,8 +87,12 @@ export function selectStacks(manifest: Manifest, ids: string[]): Stack[] {
   return [...new Set(ids)].map((id) => {
     const stack = manifest.stacks.find((item) => item.id === id);
     if (!stack) {
+      // Only near misses are worth suggesting; 'zzz' should not offer vue, go and mcp.
+      const cutoff = Math.max(2, Math.ceil(id.length / 3));
       const suggestions = manifest.stacks.filter((item) => item.status === 'complete')
-        .sort((a, b) => distance(id, a.id) - distance(id, b.id)).slice(0, 3).map((item) => item.id);
+        .map((item) => ({ id: item.id, distance: distance(id, item.id) }))
+        .filter((item) => item.distance <= cutoff)
+        .sort((a, b) => a.distance - b.distance).slice(0, 3).map((item) => item.id);
       throw new PresetsError(`Unknown stack "${id}".${suggestions.length ? ` Did you mean ${suggestions.join(', ')}?` : ''} Run presets-dev list.`);
     }
     if (stack.status === INVALID_STATUS) throw new PresetsError(`Stack "${id}" has invalid manifest data and cannot be installed. Try again later.`);
