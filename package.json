@@ -1,6 +1,6 @@
 {
   "name": "presets-dev",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Install presets.dev coding rules and skills in each tool's native paths.",
   "keywords": ["presets", "cli", "ai", "coding-rules", "agent-skills"],
   "type": "module",
